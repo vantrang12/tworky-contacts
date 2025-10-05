@@ -115,8 +115,12 @@
             const tbody = document.getElementById('contactsBody');
             const noResults = document.getElementById('noResults');
             const table = document.getElementById('contactsTable');
+            const resultCount = document.getElementById('resultCount');
             
             tbody.innerHTML = '';
+            
+            // Cập nhật số lượng kết quả
+            resultCount.textContent = `Tổng: ${contacts.length} kết quả`;
             
             if (contacts.length === 0) {
                 table.style.display = 'none';

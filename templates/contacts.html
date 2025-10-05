@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Danh bạ - Tworky Contacts</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="main-container">
+        <header class="header">
+            <div class="header-content">
+                <h1>Tworky Contacts</h1>
+                <div class="user-info">
+                    <span>Xin chào, <strong>{{ username }}</strong></span>
+                    <a href="{{ url_for('logout') }}" class="btn-logout">Đăng xuất</a>
+                </div>
+            </div>
+        </header>
+        
+        <div class="content">
+            <div class="search-section">
+                <h2>Danh bạ nhân viên</h2>
+                
+                <div class="search-controls">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Tìm kiếm theo tên đăng nhập, họ tên, mô tả...">
+                    </div>
+                    
+                    <div class="filter-box">
+                        <label for="orgFilter">Phòng/Ban:</label>
+                        <select id="orgFilter">
+                            <option value="all">Tất cả</option>
+                            {% for org in organizations %}
+                            <option value="{{ org.id }}">{{ org.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <div id="loading" class="loading">Đang tải dữ liệu...</div>
+                <div id="errorMessage" class="error-message" style="display: none;"></div>
+                
+                <table id="contactsTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>STT</th>
+                            <th>Tên đăng nhập</th>
+                            <th>Họ và tên</th>
+                            <th>Phòng/Ban</th>
+                            <th>Mô tả</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contactsBody">
+                    </tbody>
+                </table>
+                
+                <div id="noResults" class="no-results" style="display: none;">
+                    Không tìm thấy kết quả phù hợp
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let allContacts = [];
+        
+        // Tải dữ liệu khi trang load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadContacts();
+            
+            // Xử lý tìm kiếm
+            document.getElementById('searchInput').addEventListener('input', filterContacts);
+            document.getElementById('orgFilter').addEventListener('change', filterContacts);
+        });
+        
+        // Hàm tải danh sách contacts
+        function loadContacts() {
+            const loading = document.getElementById('loading');
+            const errorMessage = document.getElementById('errorMessage');
+            const table = document.getElementById('contactsTable');
+            
+            loading.style.display = 'block';
+            errorMessage.style.display = 'none';
+            table.style.display = 'none';
+            
+            fetch('/api/contacts')
+                .then(response => response.json())
+                .then(data => {
+                    loading.style.display = 'none';
+                    
+                    if (data.success) {
+                        allContacts = data.contacts;
+                        displayContacts(allContacts);
+                        table.style.display = 'table';
+                    } else {
+                        errorMessage.textContent = 'Lỗi: ' + data.error;
+                        errorMessage.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    loading.style.display = 'none';
+                    errorMessage.textContent = 'Lỗi kết nối: ' + error.message;
+                    errorMessage.style.display = 'block';
+                });
+        }
+        
+        // Hàm hiển thị contacts
+        function displayContacts(contacts) {
+            const tbody = document.getElementById('contactsBody');
+            const noResults = document.getElementById('noResults');
+            const table = document.getElementById('contactsTable');
+            
+            tbody.innerHTML = '';
+            
+            if (contacts.length === 0) {
+                table.style.display = 'none';
+                noResults.style.display = 'block';
+                return;
+            }
+            
+            table.style.display = 'table';
+            noResults.style.display = 'none';
+            
+            contacts.forEach((contact, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${escapeHtml(contact.username)}</td>
+                    <td>${escapeHtml(contact.fullname)}</td>
+                    <td>${escapeHtml(contact.organization)}</td>
+                    <td>${escapeHtml(contact.description)}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Hàm lọc contacts
+        function filterContacts() {
+            const searchText = document.getElementById('searchInput').value.toLowerCase();
+            const orgId = document.getElementById('orgFilter').value;
+            
+            let filtered = allContacts;
+            
+            // Lọc theo organization
+            if (orgId !== 'all') {
+                // Tải lại từ API với filter organization
+                const loading = document.getElementById('loading');
+                const table = document.getElementById('contactsTable');
+                
+                loading.style.display = 'block';
+                table.style.display = 'none';
+                
+                fetch(`/api/contacts?organization=${orgId}&search=${encodeURIComponent(searchText)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        loading.style.display = 'none';
+                        if (data.success) {
+                            displayContacts(data.contacts);
+                        }
+                    });
+                return;
+            }
+            
+            // Lọc theo search text
+            if (searchText) {
+                filtered = filtered.filter(contact => 
+                    contact.username.toLowerCase().includes(searchText) ||
+                    contact.fullname.toLowerCase().includes(searchText) ||
+                    contact.description.toLowerCase().includes(searchText)
+                );
+            }
+            
+            displayContacts(filtered);
+        }
+        
+        // Hàm escape HTML để tránh XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
